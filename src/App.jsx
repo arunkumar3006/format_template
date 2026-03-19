@@ -33,7 +33,7 @@ const App = () => {
     setIsGenerating(true);
     setError(null);
     setDownloadUrl(null);
-    setStatus([{ id: 1, msg: 'Initializing report generation...', active: true }]);
+    setStatus([{ id: 1, msg: 'Initializing nexus mission...', active: true }]);
 
     try {
       const formData = new FormData();
@@ -46,17 +46,26 @@ const App = () => {
       });
 
       if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.detail || 'Failed to generate report');
+        // Robust error text extraction
+        const errorText = await response.text();
+        let errorMessage = errorText;
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorMessage = errorJson.detail || errorText;
+        } catch (e) {
+          // If not JSON, show the first 100 characters of the response
+          errorMessage = errorText.substring(0, 100);
+        }
+        throw new Error(errorMessage);
       }
 
-      addStatus('Processing 4,000+ data rows...');
-      addStatus('Structuring report document...');
+      addStatus('Decrypting 4,000+ data nodes...');
+      addStatus('Assembling Strategic Briefing...');
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       setDownloadUrl(url);
-      addStatus('Generation Successful: Ready to download.');
+      addStatus('Mission Accomplished: Report Ready.');
       
     } catch (err) {
       setError(err.message);
@@ -120,7 +129,7 @@ const App = () => {
             ) : (
               <Plus size={20} />
             )}
-            <span>{isGenerating ? "Generating Report..." : "Generate Report"}</span>
+            <span>{isGenerating ? "Executing Mission..." : "Generate Report"}</span>
           </button>
 
           <AnimatePresence>
@@ -150,7 +159,7 @@ const App = () => {
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     href={downloadUrl}
-                    download={`News_Report_${new Date().toISOString().split('T')[0]}.docx`}
+                    download={`Final_Briefing_${new Date().toISOString().split('T')[0]}.docx`}
                     className="btn-download-modern"
                   >
                     <Download size={20} /> Download Final Report

@@ -1,10 +1,10 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import io
 import logging
 
-# Ensure imports work
+# Standardized Imports
 try:
     from .data_loader import load_dataset
     from .template_reader import read_template
@@ -31,7 +31,7 @@ app.add_middleware(
 
 @app.get("/api/health")
 def root():
-    return {"status": "ok", "message": "News Generator API is active"}
+    return {"status": "ok", "message": "API Active"}
 
 @app.post("/api/generate")
 async def generate_report(
@@ -39,31 +39,29 @@ async def generate_report(
     template: UploadFile = File(...)
 ):
     try:
-        # Load Dataset (Lightweight mode)
+        # Load Dataset
         ds_content = await dataset.read()
         data, ds_msg = load_dataset(io.BytesIO(ds_content))
         
-        # Check against list instead of dataframe empty
         if not data:
-            raise HTTPException(status_code=400, detail=ds_msg)
+            return JSONResponse(status_code=400, content={"detail": ds_msg})
 
         # Read Template
         tmpl_content = await template.read()
         template_info, tmpl_msg = read_template(io.BytesIO(tmpl_content))
         
         if not template_info.sections:
-            raise HTTPException(status_code=400, detail="Could not detect template sections.")
+            return JSONResponse(status_code=400, content={"detail": "Detecting template failed."})
 
-        # Build article blocks (Passing list of dicts)
+        # Build article blocks
         blocks, build_msg = build_article_blocks(data, template_info)
         
         if not blocks:
-            raise HTTPException(status_code=400, detail="No articles were found.")
+            return JSONResponse(status_code=400, content={"detail": "Build failed."})
 
-        # Write Final Document
+        # Final Document Synthesis
         buffer, write_msg = build_document(template_info, blocks)
         
-        # Stream result back to client
         return StreamingResponse(
             buffer,
             media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -73,5 +71,5 @@ async def generate_report(
         )
 
     except Exception as e:
-        logger.exception("Internal Generation Error")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Global Generation Exception")
+        return JSONResponse(status_code=500, content={"detail": str(e)})
