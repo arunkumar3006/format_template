@@ -3,20 +3,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FileSpreadsheet, 
   FileText, 
-  Settings, 
   Download, 
   CheckCircle, 
   AlertCircle, 
   Loader2, 
   ArrowRight,
-  ShieldCheck,
-  Zap,
-  LayoutDashboard,
-  Newspaper,
-  Crosshair,
-  Briefcase,
-  Activity,
-  LogOut,
   Plus
 } from 'lucide-react';
 import './App.css';
@@ -42,7 +33,7 @@ const App = () => {
     setIsGenerating(true);
     setError(null);
     setDownloadUrl(null);
-    setStatus([{ id: 1, msg: 'Initializing nexus Mission...', active: true }]);
+    setStatus([{ id: 1, msg: 'Initializing report generation...', active: true }]);
 
     try {
       const formData = new FormData();
@@ -59,13 +50,13 @@ const App = () => {
         throw new Error(errData.detail || 'Failed to generate report');
       }
 
-      addStatus('Decrypting 4,000+ data nodes...');
-      addStatus('Assembling Strategic Briefing...');
+      addStatus('Processing 4,000+ data rows...');
+      addStatus('Structuring report document...');
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       setDownloadUrl(url);
-      addStatus('Mission Accomplished: Report Ready.');
+      addStatus('Generation Successful: Ready to download.');
       
     } catch (err) {
       setError(err.message);
@@ -77,39 +68,7 @@ const App = () => {
 
   return (
     <div className="layout">
-      {/* SIDEBAR */}
-      <aside className="sidebar">
-        <div className="logo-area">
-          <div className="logo-icon">✦</div>
-          <div className="logo-text">
-            <h2>Nexus</h2>
-            <div className="logo-sub">Intelligence Tracker</div>
-          </div>
-        </div>
-
-        <nav className="nav-menu">
-          <a href="#" className="nav-item active"><LayoutDashboard /> Dashboard</a>
-          <a href="#" className="nav-item"><Newspaper /> Articles</a>
-          <a href="#" className="nav-item"><Crosshair /> Brand Tracker</a>
-          <a href="#" className="nav-item"><Briefcase /> Jobs</a>
-          <a href="#" className="nav-item"><Activity /> Diagnostics</a>
-        </nav>
-
-        <div style={{ marginTop: 'auto' }}>
-          <div style={{ padding: '0 1rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: '#10b981' }}>
-             <span style={{ width: '8px', height: '8px', background: '#10b981', borderRadius: '50%' }}></span> Connected
-          </div>
-          <a href="#" className="nav-item" style={{ color: '#ef4444' }}><LogOut /> Sign Out</a>
-        </div>
-      </aside>
-
-      {/* MAIN CONTENT */}
       <main className="content">
-        <header className="header-meta animate-in">
-          <h1>Intelligence Overview</h1>
-          <p>Nexus Global — Strategic Command Center</p>
-        </header>
-
         <div className="dashboard-grid">
           {/* Dataset Upload */}
           <motion.div 
@@ -120,8 +79,8 @@ const App = () => {
             style={{ animationDelay: '0.1s' }}
           >
             <div className="stat-icon"><FileSpreadsheet size={24} /></div>
-            <h3>1. Intelligence Dataset</h3>
-            <p>{dataset ? dataset.name : "Validated articles Excel / CSV "}</p>
+            <h3>1. Intelligent Dataset</h3>
+            <p>{dataset ? dataset.name : "Select source file (XLSX / CSV)"}</p>
             <input 
               type="file" 
               ref={datasetRef} 
@@ -140,7 +99,7 @@ const App = () => {
           >
             <div className="stat-icon"><FileText size={24} /></div>
             <h3>2. Briefing Template</h3>
-            <p>{template ? template.name : "Strategic report DOCX structure"}</p>
+            <p>{template ? template.name : "Select Word template structure"}</p>
             <input 
               type="file" 
               ref={templateRef} 
@@ -161,7 +120,7 @@ const App = () => {
             ) : (
               <Plus size={20} />
             )}
-            <span>{isGenerating ? "Executing Mission..." : "New Intelligence Mission"}</span>
+            <span>{isGenerating ? "Generating Report..." : "Generate Report"}</span>
           </button>
 
           <AnimatePresence>
@@ -188,13 +147,13 @@ const App = () => {
                 
                 {downloadUrl && (
                   <motion.a
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
                     href={downloadUrl}
-                    download={`NEXUS_REPORT_${new Date().toISOString().split('T')[0]}.docx`}
+                    download={`News_Report_${new Date().toISOString().split('T')[0]}.docx`}
                     className="btn-download-modern"
                   >
-                    <Download size={20} /> Download Intelligence Summary
+                    <Download size={20} /> Download Final Report
                   </motion.a>
                 )}
               </motion.div>
@@ -202,8 +161,8 @@ const App = () => {
           </AnimatePresence>
         </section>
 
-        <footer style={{ marginTop: '5rem', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-          &copy; 2026 NEXUS GLOBAL &middot; STRATEGIC COMMAND HUB &middot; V.2.4.0
+        <footer style={{ marginTop: '5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+          &copy; 2026 Reporting System &middot; Power by NEXUS LXML Core
         </footer>
       </main>
     </div>
