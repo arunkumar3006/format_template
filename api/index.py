@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import io
 import logging
 
-# Ensure imports work regardless of execution context (serverless / local)
+# Ensure imports work
 try:
     from .data_loader import load_dataset
     from .template_reader import read_template
@@ -39,11 +39,12 @@ async def generate_report(
     template: UploadFile = File(...)
 ):
     try:
-        # Load Dataset
+        # Load Dataset (Lightweight mode)
         ds_content = await dataset.read()
-        df, ds_msg = load_dataset(io.BytesIO(ds_content))
+        data, ds_msg = load_dataset(io.BytesIO(ds_content))
         
-        if df.empty:
+        # Check against list instead of dataframe empty
+        if not data:
             raise HTTPException(status_code=400, detail=ds_msg)
 
         # Read Template
@@ -53,21 +54,21 @@ async def generate_report(
         if not template_info.sections:
             raise HTTPException(status_code=400, detail="Could not detect template sections.")
 
-        # Build article blocks
-        blocks, build_msg = build_article_blocks(df, template_info)
+        # Build article blocks (Passing list of dicts)
+        blocks, build_msg = build_article_blocks(data, template_info)
         
         if not blocks:
-            raise HTTPException(status_code=400, detail="No articles found.")
+            raise HTTPException(status_code=400, detail="No articles were found.")
 
         # Write Final Document
         buffer, write_msg = build_document(template_info, blocks)
         
-        # Stream download result
+        # Stream result back to client
         return StreamingResponse(
             buffer,
             media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             headers={
-                "Content-Disposition": "attachment; filename=News_Report.docx"
+                "Content-Disposition": f"attachment; filename=News_Report.docx"
             }
         )
 
