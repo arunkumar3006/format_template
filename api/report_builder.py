@@ -2,10 +2,20 @@ import logging
 from typing import Any
 
 # Robust import for Vercel / Local
+# Try absolute import from current directory
 try:
-    from .template_reader import TemplateInfo, DEFAULT_SECTION
-except ImportError:
+    import template_reader
     from template_reader import TemplateInfo, DEFAULT_SECTION
+except ImportError:
+    try:
+        from . import template_reader
+        from .template_reader import TemplateInfo, DEFAULT_SECTION
+    except ImportError:
+        # Final fallback
+        import sys, os
+        sys.path.append(os.path.dirname(__file__))
+        import template_reader
+        from template_reader import TemplateInfo, DEFAULT_SECTION
 
 logger = logging.getLogger(__name__)
 

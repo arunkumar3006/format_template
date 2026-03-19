@@ -3,18 +3,24 @@ from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import io
 import logging
+import sys
+import os
 
-# Standardized Imports
+# Ensure the 'api' directory is in path for absolute imports on Vercel
+sys.path.append(os.path.dirname(__file__))
+
+# Absolute imports (Stable for Vercel)
 try:
-    from .data_loader import load_dataset
-    from .template_reader import read_template
-    from .report_builder import build_article_blocks
-    from .docx_writer import build_document
+    import data_loader
+    import template_reader
+    import report_builder
+    import docx_writer
 except ImportError:
-    from data_loader import load_dataset
-    from template_reader import read_template
-    from report_builder import build_article_blocks
-    from docx_writer import build_document
+    # Fallback for different build environments
+    from . import data_loader
+    from . import template_reader
+    from . import report_builder
+    from . import docx_writer
 
 # Logging setup
 logging.basicConfig(level=logging.INFO)
@@ -39,28 +45,28 @@ async def generate_report(
     template: UploadFile = File(...)
 ):
     try:
-        # Load Dataset
+        # 1. Load Dataset
         ds_content = await dataset.read()
-        data, ds_msg = load_dataset(io.BytesIO(ds_content))
+        data, ds_msg = data_loader.load_dataset(io.BytesIO(ds_content))
         
         if not data:
             return JSONResponse(status_code=400, content={"detail": ds_msg})
 
-        # Read Template
+        # 2. Read Template
         tmpl_content = await template.read()
-        template_info, tmpl_msg = read_template(io.BytesIO(tmpl_content))
+        template_info, tmpl_msg = template_reader.read_template(io.BytesIO(tmpl_content))
         
         if not template_info.sections:
             return JSONResponse(status_code=400, content={"detail": "Detecting template failed."})
 
-        # Build article blocks
-        blocks, build_msg = build_article_blocks(data, template_info)
+        # 3. Build Article Blocks
+        blocks, build_msg = report_builder.build_article_blocks(data, template_info)
         
         if not blocks:
             return JSONResponse(status_code=400, content={"detail": "Build failed."})
 
-        # Final Document Synthesis
-        buffer, write_msg = build_document(template_info, blocks)
+        # 4. Final Document Synthesis
+        buffer, write_msg = docx_writer.build_document(template_info, blocks)
         
         return StreamingResponse(
             buffer,
@@ -72,4 +78,4 @@ async def generate_report(
 
     except Exception as e:
         logger.exception("Global Generation Exception")
-        return JSONResponse(status_code=500, content={"detail": str(e)})
+        return JSONResponse(status_code=500, content={"detail": f"Execution Error: {str(e)}"})
