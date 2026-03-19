@@ -1,0 +1,23 @@
+# Node
+node_modules/
+dist/
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+api/node_modules/
+api/.venv/
+api/venv/
+
+# Env & Misc
+.env
+.DS_Store
+.vercel
+.streamlit/
+*.docx
+*.xlsx
+*.xls
+*.csv
+!api/requirements.txt
