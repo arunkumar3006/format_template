@@ -15,11 +15,11 @@ logger = logging.getLogger(__name__)
 # Canonical columns and their variations
 COLUMN_ALIASES = {
     "title": ["title", "headline", "subject", "article_title", "news_title"],
-    "author_or_journalist": ["author", "journalist", "reporter", "writer", "byline", "author_name"],
-    "publisher_name": ["publisher", "publication", "source", "publisher_name", "media_house"],
-    "date_time": ["date", "time", "date_time", "published_at", "timestamp"],
+    "author_or_journalist": ["author", "journalist", "reporter", "writer", "byline", "author_name", "author/reporter", "author/journalist"],
+    "publisher_name": ["publisher", "publication", "source", "publisher_name", "media_house", "publisher/agency", "publisher/agency"],
+    "date_time": ["date", "time", "date_time", "published_at", "timestamp", "published at"],
     "summary_of_article": ["summary", "description", "content", "abstract", "summary_of_article"],
-    "link": ["link", "url", "url_of_article", "source_url", "article_url"],
+    "link": ["link", "url", "url_of_article", "source_url", "article_url", "resolved url", "resolved_url", "link_of_article"],
     "category": ["category", "section", "news_type", "tag", "industry"]
 }
 
@@ -31,10 +31,16 @@ def _normalise(val) -> str:
 
 def _match_column(header_name: str) -> str:
     """Match a raw header against the canonical aliases."""
-    norm_header = str(header_name).strip().lower().replace(" ", "_")
+    if not header_name: return "unknown"
+    # Aggressive normalization: remove non-alphanumeric for matching
+    clean = "".join(c for c in str(header_name).lower() if c.isalnum() or c == "_")
+    norm_header = clean.strip().replace(" ", "_")
+    
     for canonical, aliases in COLUMN_ALIASES.items():
-        if norm_header in [a.lower() for a in aliases]:
-            return canonical
+        for alias in aliases:
+            clean_alias = "".join(c for c in alias.lower() if c.isalnum() or c == "_")
+            if norm_header == clean_alias:
+                return canonical
     return header_name  # Keep as-is if no match
 
 def load_dataset(file_object) -> tuple[list, str]:

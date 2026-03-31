@@ -49,6 +49,7 @@ def build_article_blocks(
         title     = _get(row, "title")
         link      = _get(row, "link")
         summary   = _get(row, "summary_of_article")
+        date_time = _get(row, "date_time")
 
         publisher_author = f"{publisher} | {author}"
 
@@ -65,6 +66,7 @@ def build_article_blocks(
             "title":            title,
             "link":             link,
             "summary":          summary,
+            "date_time":        date_time,
             "section":          section,
         })
 

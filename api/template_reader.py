@@ -43,8 +43,8 @@ class TemplateInfo:
     article_style: ParagraphStyle = field(default_factory=ParagraphStyle)
     
     # Adaptive Field Order: detect what fields are used and in what order
-    # Valid fields: "publisher_author", "title", "link", "summary"
-    field_order: list = field(default_factory=lambda: ["publisher_author", "title", "link", "summary"])
+    # Valid fields: "publisher_author", "title", "link", "summary", "date_time"
+    field_order: list = field(default_factory=lambda: ["publisher_author", "title", "link", "summary", "date_time"])
     
     has_categories: bool = False
     raw_doc: Optional[object] = None
@@ -79,16 +79,19 @@ def _detect_field(text: str) -> Optional[str]:
     Detect which article field a template line represents.
     Rules:
       - Contains '|' -> publisher_author
-      - Contains 'http' -> link
-      - > 8 words -> summary
+      - Contains 'http' or 'url' keywords -> link
+      - Contains 'date' or 'published' -> date_time
+      - Contains 'summary' or > 8 words -> summary
       - else -> title
     """
-    t = text.strip()
+    t = text.strip().lower()
     if "|" in t:
         return "publisher_author"
-    if re.search(r"https?://", t, re.I):
+    if re.search(r"https?://", t, re.I) or any(k in t for k in ["resolved url", "url", "link"]):
         return "link"
-    if len(t.split()) > 8:
+    if any(k in t for k in ["date", "time", "published"]):
+        return "date_time"
+    if any(k in t for k in ["summary", "description", "abstract"]) or len(t.split()) > 8:
         return "summary"
     return "title"
 
@@ -120,22 +123,31 @@ def read_template(file_object) -> tuple[TemplateInfo, str]:
             info.has_categories = True
             continue
 
+        # Pattern detection (Everywhere)
+        f_type = _detect_field(text)
+        
+        # If it's a specific field (not just a generic title) or we are already past header
+        # Update: We now treat "title" keyword as specific too!
+        is_specific = f_type in ["publisher_author", "link", "summary", "date_time"] or "title" in text.lower()
+        
+        if f_type and (not in_header or is_specific):
+            if f_type not in captured_fields:
+                captured_fields.append(f_type)
+                if not info.article_style.font_name:
+                    info.article_style = _extract_para_style(para)
+            
+            # If we found an article field in the header area, 
+            # use it for the layout but don't treat it as a static global title
+            if in_header and is_specific:
+                continue
+
         if in_header:
             info.title_paragraphs.append((text, _extract_para_style(para)))
             continue
 
-        # Pattern detection phase (after first section)
-        # We look for a pattern of fields to determine field_order
-        f_type = _detect_field(text)
-        if f_type and f_type not in captured_fields:
-            captured_fields.append(f_type)
-            # Capture base article style from the first detected field
-            if not info.article_style.font_name:
-                info.article_style = _extract_para_style(para)
-
     if captured_fields:
         info.field_order = captured_fields
-        logger.info("Detected field order from template: %s", info.field_order)
+        logger.info("Universal field order detection: %s", info.field_order)
 
     if not info.sections:
         info.sections = [DEFAULT_SECTION]
