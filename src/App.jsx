@@ -1,44 +1,130 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FileSpreadsheet, 
-  FileText, 
+  Settings, 
   Download, 
   CheckCircle, 
   AlertCircle, 
   Loader2, 
+  Plus,
+  ArrowUp,
+  ArrowDown,
+  Trash2,
+  RotateCcw,
+  Link,
+  Users,
+  Calendar,
+  Type,
+  AlignLeft,
+  Zap,
+  Sparkles,
+  Layers,
+  HelpCircle,
+  Info,
+  Eye,
   ArrowRight,
-  Plus
+  Maximize2,
+  X,
+  Table as TableIcon
 } from 'lucide-react';
 import './App.css';
 
+const FIELD_POOL = [
+  { id: 'title', label: 'Title', icon: <Type size={20} /> },
+  { id: 'link', label: 'Resolved URL', icon: <Link size={20} /> },
+  { id: 'publisher_author', label: 'Publisher/Agency | Author', icon: <Users size={20} /> },
+  { id: 'summary_of_article', label: 'Summary', icon: <AlignLeft size={20} /> },
+  { id: 'date_time', label: 'Published At', icon: <Calendar size={20} /> }
+];
+
 const App = () => {
   const [dataset, setDataset] = useState(null);
-  const [template, setTemplate] = useState(null);
+  const [dataPreview, setDataPreview] = useState(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [fields, setFields] = useState([...FIELD_POOL]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [showAddMenu, setShowAddMenu] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState(null);
   const [error, setError] = useState(null);
   const [status, setStatus] = useState([]);
 
   const datasetRef = useRef(null);
-  const templateRef = useRef(null);
 
   const addStatus = (msg) => {
     setStatus(prev => [...prev, { id: Date.now(), msg, complete: true }]);
   };
 
+  const fetchPreview = async (file) => {
+    setIsPreviewLoading(true);
+    setError(null);
+    const formData = new FormData();
+    formData.append('dataset', file);
+    try {
+      const res = await fetch('/api/preview', { method: 'POST', body: formData });
+      const json = await res.json();
+      if (res.ok) {
+        setDataPreview(json);
+      } else {
+        setError(json.error || "Failed to parse dataset.");
+      }
+    } catch (e) { 
+      setError("Network error during preview synthesis.");
+      console.error("Preview fetch failed", e); 
+    } finally {
+      setIsPreviewLoading(false);
+    }
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setDataset(file);
+      setDataPreview(null);
+      fetchPreview(file);
+    }
+  };
+
+  const moveField = (index, direction) => {
+    const newFields = [...fields];
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= fields.length) return;
+    [newFields[index], newFields[newIndex]] = [newFields[newIndex], newFields[index]];
+    setFields(newFields);
+  };
+
+  const removeField = (id) => {
+    setFields(fields.filter(f => f.id !== id));
+  };
+
+  const addField = (field) => {
+    if (!fields.find(f => f.id === field.id)) {
+      setFields([...fields, field]);
+    }
+    setShowAddMenu(false);
+  };
+
+  const resetFields = () => {
+    setFields([...FIELD_POOL]);
+    setShowAddMenu(false);
+  };
+
+  const unusedFields = FIELD_POOL.filter(p => !fields.find(f => f.id === p.id));
+
   const handleGenerate = async () => {
-    if (!dataset || !template) return;
+    if (!dataset || fields.length === 0) return;
 
     setIsGenerating(true);
     setError(null);
     setDownloadUrl(null);
-    setStatus([{ id: 1, msg: 'Initializing nexus mission...', active: true }]);
+    setStatus([{ id: 1, msg: 'Calibrating AI synthesis...', active: true }]);
 
     try {
       const formData = new FormData();
       formData.append('dataset', dataset);
-      formData.append('template', template);
+      formData.append('field_order', fields.map(f => f.id).join(','));
       
       const response = await fetch('/api/generate', {
         method: 'POST',
@@ -46,26 +132,16 @@ const App = () => {
       });
 
       if (!response.ok) {
-        // Robust error text extraction
-        const errorText = await response.text();
-        let errorMessage = errorText;
-        try {
-          const errorJson = JSON.parse(errorText);
-          errorMessage = errorJson.detail || errorText;
-        } catch (e) {
-          // If not JSON, show the first 100 characters of the response
-          errorMessage = errorText.substring(0, 100);
-        }
-        throw new Error(errorMessage);
+        throw new Error(`Synthesis Failed (${response.status})`);
       }
 
-      addStatus('Decrypting 4,000+ data nodes...');
-      addStatus('Assembling Strategic Briefing...');
+      addStatus('Neural mapping complete...');
+      addStatus('Finalizing document architecture...');
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       setDownloadUrl(url);
-      addStatus('Mission Accomplished: Report Ready.');
+      addStatus('Report Ready for Deployment.');
       
     } catch (err) {
       setError(err.message);
@@ -76,104 +152,260 @@ const App = () => {
   };
 
   return (
-    <div className="layout">
-      <main className="content">
-        <div className="dashboard-grid">
-          {/* Dataset Upload */}
-          <motion.div 
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.99 }}
-            className={`stat-card animate-in ${dataset ? 'active' : ''}`}
-            onClick={() => datasetRef.current.click()}
-            style={{ animationDelay: '0.1s' }}
-          >
-            <div className="stat-icon"><FileSpreadsheet size={24} /></div>
-            <h3>1. Intelligent Dataset</h3>
-            <p>{dataset ? dataset.name : "Select source file (XLSX / CSV)"}</p>
-            <input 
-              type="file" 
-              ref={datasetRef} 
-              onChange={(e) => setDataset(e.target.files[0])}
-              accept=".xlsx,.xls,.csv"
-            />
+    <div className="layout-elite">
+      <div className="neural-overlay"></div>
+      
+      <main className="studio-container">
+        <header className="studio-header">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="studio-badge">
+            <Sparkles size={14} /> Intelligence Port
           </motion.div>
+          <h1>Report <span>Generator</span></h1>
+          <p>Transform raw analytics into boardroom-ready intelligence.</p>
+        </header>
 
-          {/* Template Upload */}
-          <motion.div 
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.99 }}
-            className={`stat-card animate-in ${template ? 'active' : ''}`}
-            onClick={() => templateRef.current.click()}
-            style={{ animationDelay: '0.2s' }}
-          >
-            <div className="stat-icon"><FileText size={24} /></div>
-            <h3>2. Briefing Template</h3>
-            <p>{template ? template.name : "Select Word template structure"}</p>
-            <input 
-              type="file" 
-              ref={templateRef} 
-              onChange={(e) => setTemplate(e.target.files[0])}
-              accept=".docx"
-            />
-          </motion.div>
-        </div>
+        <div className="three-pillar-grid">
+          {/* STEP 1: UPLOAD */}
+          <section className="pillar">
+            <div className="pillar-label">
+              <span className="step-num">01</span>
+              Intel Acquisition
+            </div>
+            <motion.div 
+              whileHover={{ scale: 1.01 }}
+              className={`pillar-card upload-zone ${dataset ? 'complete' : ''}`}
+              onClick={() => dataset ? setShowPreviewModal(true) : datasetRef.current.click()}
+            >
+              <div className="uploader-content">
+                <div className="pillar-icon">
+                  {dataset ? <TableIcon size={32} /> : <FileSpreadsheet size={32} />}
+                </div>
+                <h3>{dataset ? "Inspecting Stream" : "Import Data"}</h3>
+                <p>{dataset ? dataset.name : "Click to select XLSX/CSV dataset"}</p>
+                {dataset && (
+                  <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="inspect-btn">
+                     <Maximize2 size={12} /> View Dataset Preview
+                  </motion.div>
+                )}
+              </div>
+              
+              {dataset && (
+                <div className="file-actions-row">
+                  <button className="change-file-btn" onClick={() => datasetRef.current.click()}>Change Source</button>
+                </div>
+              )}
+              
+              <input 
+                type="file" 
+                ref={datasetRef} 
+                onChange={handleFileUpload}
+                accept=".xlsx,.xls,.csv"
+                style={{ display: 'none' }}
+              />
+            </motion.div>
+            <div className="pillar-hint">
+              <Info size={14} /> Click card to preview uploaded articles.
+            </div>
+          </section>
 
-        <section className="animate-in" style={{ animationDelay: '0.3s' }}>
-          <button 
-            className="btn-blue"
-            onClick={handleGenerate}
-            disabled={!dataset || !template || isGenerating}
-          >
-            {isGenerating ? (
-              <Loader2 className="animate-spin" />
-            ) : (
-              <Plus size={20} />
-            )}
-            <span>{isGenerating ? "Executing Mission..." : "Generate Report"}</span>
-          </button>
-
-          <AnimatePresence>
-            {error && (
-              <div className="status-box" style={{ borderLeft: '4px solid #ef4444' }}>
-                <div className="status-line" style={{ color: '#ef4444' }}>
-                  <AlertCircle size={18} /> {error}
+          {/* STEP 2: CONFIGURE */}
+          <section className="pillar">
+            <div className="pillar-label">
+              <span className="step-num">02</span>
+              Structural Logic
+            </div>
+            <div className="pillar-card logic-zone">
+              <div className="logic-header">
+                <div className="logic-title">
+                  <Settings size={18} /> Architecture
+                </div>
+                <div className="logic-actions">
+                  <button onClick={() => setShowGuide(!showGuide)} className="icon-btn-pill"><HelpCircle size={16} /></button>
+                  <button onClick={resetFields} className="icon-btn-pill"><RotateCcw size={16} /></button>
                 </div>
               </div>
-            )}
 
-            {(status.length > 0 || downloadUrl) && (
-              <motion.div 
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                className="status-box"
-              >
-                {status.map((s) => (
-                  <div key={s.id} className="status-line" style={{ color: s.complete ? '#10b981' : '#2563eb' }}>
-                     {s.complete ? <CheckCircle size={18} /> : <Loader2 size={18} className="animate-spin" />}
-                     {s.msg}
-                  </div>
-                ))}
-                
-                {downloadUrl && (
-                  <motion.a
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    href={downloadUrl}
-                    download={`Final_Briefing_${new Date().toISOString().split('T')[0]}.docx`}
-                    className="btn-download-modern"
-                  >
-                    <Download size={20} /> Download Final Report
-                  </motion.a>
+              <AnimatePresence>
+                {showGuide && (
+                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0 }} className="mini-guide">
+                    <p>Reorder layers to change report flow.</p>
+                  </motion.div>
                 )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </section>
+              </AnimatePresence>
 
-        <footer style={{ marginTop: '5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-          &copy; 2026 Reporting System &middot; Power by NEXUS LXML Core
-        </footer>
+              <div className="logic-list">
+                <AnimatePresence>
+                  {fields.map((field, idx) => (
+                    <motion.div layout key={field.id} className="logic-item">
+                      <div className="logic-item-info">
+                        <span className="item-icon-box">{field.icon}</span>
+                        <span className="item-text">{field.label}</span>
+                      </div>
+                      <div className="logic-item-btns">
+                        <button onClick={(e) => { e.stopPropagation(); moveField(idx, -1); }} disabled={idx === 0}><ArrowUp size={16} /></button>
+                        <button onClick={(e) => { e.stopPropagation(); moveField(idx, 1); }} disabled={idx === fields.length - 1}><ArrowDown size={16} /></button>
+                        <button onClick={(e) => { e.stopPropagation(); removeField(field.id); }} className="red-btn"><Trash2 size={16} /></button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+
+                <div className="add-logic-wrap">
+                  <button className="add-logic-btn" onClick={() => setShowAddMenu(!showAddMenu)}>
+                    <Plus size={16} /> Add Section
+                  </button>
+                  {showAddMenu && unusedFields.length > 0 && (
+                    <div className="add-dropdown-elite">
+                      {unusedFields.map(f => (
+                        <div key={f.id} className="add-item-elite" onClick={() => addField(f)}>
+                           {f.icon} {f.label}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* STEP 3: PREVIEW */}
+          <section className="pillar">
+            <div className="pillar-label">
+              <span className="step-num">03</span>
+              Visual Synthesis
+            </div>
+            <div className="pillar-card preview-zone">
+              <div className="preview-indicator">
+                <Eye size={16} /> Live Proof
+              </div>
+              <div className="paper-mock">
+                <div className="mock-rule" />
+                <div className="mock-content">
+                  {fields.map(f => (
+                    <div key={f.id} className={`mock-f field-${f.id}`}>
+                      {f.id === 'title' && "Intelligence Synthesis: Q2 Market Shift"}
+                      {f.id === 'link' && "https://platform.intel/report-q2"}
+                      {f.id === 'publisher_author' && "Strategic Lab & Partners"}
+                      {f.id === 'summary_of_article' && "Automated analysis reveals critical deviations in forecast patterns. Mitigation strategies recommended for immediate deployment."}
+                      {f.id === 'date_time' && "Monday, April 13, 2026"}
+                    </div>
+                  ))}
+                </div>
+                <div className="mock-seal" />
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <section className="studio-footer">
+          <div className="generate-wrap">
+            <motion.button 
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="btn-generate-elite"
+              onClick={handleGenerate}
+              disabled={!dataset || isGenerating || fields.length === 0}
+            >
+              {isGenerating ? <Loader2 className="animate-spin" /> : <Zap size={22} fill="currentColor" />}
+              <span>{isGenerating ? "Generating..." : "Generate Report"}</span>
+              <ArrowRight size={20} className="arrow-move" />
+            </motion.button>
+            
+            <AnimatePresence>
+              {(status.length > 0 || downloadUrl || error) && (
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="system-log">
+                   {error && <div className="log-line error-log"><AlertCircle size={16} /> {error}</div>}
+                   {status.map(s => (
+                     <div key={s.id} className="log-line">
+                       <CheckCircle size={16} color="#10b981" /> {s.msg}
+                     </div>
+                   ))}
+                   {downloadUrl && (
+                     <a href={downloadUrl} download="Morning_Tracker_Elite.docx" className="log-btn-download">
+                       <Download size={18} /> Download Strategic Briefing (.docx)
+                     </a>
+                   )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </section>
       </main>
+
+      {/* DATA PREVIEW MODAL */}
+      <AnimatePresence>
+        {showPreviewModal && (
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }} 
+            className="modal-backdrop"
+            onClick={() => setShowPreviewModal(false)}
+          >
+            <motion.div 
+              initial={{ scale: 0.95, y: 20 }} 
+              animate={{ scale: 1, y: 0 }} 
+              exit={{ scale: 0.95, y: 20 }} 
+              className="modal-card-beast"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="modal-header">
+                 <div className="modal-title">
+                    <TableIcon size={20} /> FULL DATASET TRACE
+                    {dataPreview && <span>{dataPreview.total_rows} Entries Mapped</span>}
+                 </div>
+                 <button className="close-btn" onClick={() => setShowPreviewModal(false)}><X size={20} /></button>
+              </div>
+              
+              <div className="modal-body">
+                {isPreviewLoading ? (
+                  <div className="modal-loader-wrap">
+                    <Loader2 size={48} className="animate-spin" color="var(--primary)" />
+                    <p>Synthesizing Data Matrix...</p>
+                  </div>
+                ) : dataPreview ? (
+                  <div className="modal-table-wrap">
+                    <table className="beast-table">
+                      <thead>
+                        <tr>
+                          {Object.keys(dataPreview.preview[0]).map(h => (
+                            <th key={h}>{h.replace(/_/g, ' ').toUpperCase()}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dataPreview.preview.map((row, i) => (
+                          <tr key={i}>
+                            {Object.values(row).map((v, j) => (
+                              <td key={j}>{String(v)}</td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : error ? (
+                  <div className="modal-error-wrap">
+                    <AlertCircle size={48} color="#ef4444" />
+                    <p>{error}</p>
+                    <button className="modal-btn-primary" onClick={() => datasetRef.current.click()}>Try Different File</button>
+                  </div>
+                ) : (
+                  <div className="modal-loader-wrap">
+                    <Info size={48} color="#94a3b8" />
+                    <p>No data loaded.</p>
+                  </div>
+                )}
+              </div>
+              
+              <div className="modal-footer">
+                 <div className="status-pill">{dataPreview?.message || (error ? "Mapping Failed" : "Awaiting Byte-stream...")}</div>
+                 <button className="modal-btn-primary" onClick={() => setShowPreviewModal(false)}>Close Preview</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

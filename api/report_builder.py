@@ -44,6 +44,8 @@ def build_article_blocks(
     default_section = template_info.sections[0] if template_info.sections else DEFAULT_SECTION
 
     for row in dataset_rows:
+        block = dict(row) # Copy all columns to preserve custom fields
+
         publisher = _get(row, "publisher_name")
         author    = _get(row, "author_or_journalist")
         title     = _get(row, "title")
@@ -51,7 +53,14 @@ def build_article_blocks(
         summary   = _get(row, "summary_of_article")
         date_time = _get(row, "date_time")
 
-        publisher_author = f"{publisher} | {author}"
+        block["publisher_author"] = f"{publisher} | {author}"
+        # Make sure explicitly extracted standard canonical variables exist
+        block["title"] = title
+        block["link"] = link
+        block["summary_of_article"] = summary
+        block["date_time"] = date_time
+        block["publisher_name"] = publisher
+        block["author_or_journalist"] = author
 
         section = default_section
         if "category" in row and template_info.has_categories:
@@ -61,14 +70,8 @@ def build_article_blocks(
                     section = sec
                     break
 
-        blocks.append({
-            "publisher_author": publisher_author,
-            "title":            title,
-            "link":             link,
-            "summary":          summary,
-            "date_time":        date_time,
-            "section":          section,
-        })
+        block["section"] = section
+        blocks.append(block)
 
     msg = f"✅ {len(blocks):,} article block(s) built."
     logger.info(msg)

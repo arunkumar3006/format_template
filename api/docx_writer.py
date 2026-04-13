@@ -274,6 +274,14 @@ def build_document(template_info: TemplateInfo, article_blocks: list[dict]) -> t
                 # The report now follows your template sequence exactly
                 for field_name in order:
                     val = b.get(field_name, "N/A")
+                    
+                    # If it wasn't found under the exact case, try case-insensitive
+                    if val == "N/A" and field_name != "title":
+                        for k, v in b.items():
+                            if str(k).lower() == field_name.lower():
+                                val = str(v)
+                                break
+
                     if val == "N/A" and field_name != "title":
                         continue # Skip empty metadata if desired, except title
 
@@ -288,9 +296,9 @@ def build_document(template_info: TemplateInfo, article_blocks: list[dict]) -> t
                             meta_cache = _StyleCache(art_style).with_color(COLOR_GREY).with_size(art_cache.font_size_pt - 1)
                             _append(_make_paragraph_xml(clean_val, meta_cache, italic=True))
 
-                    elif field_name == "date_time":
-                        date_cache = _StyleCache(art_style).with_color(COLOR_GREY).with_size(art_cache.font_size_pt - 1)
-                        _append(_make_paragraph_xml(val, date_cache, italic=True))
+                    elif field_name in ["publisher_name", "author_or_journalist", "date_time"]:
+                        meta_cache = _StyleCache(art_style).with_color(COLOR_GREY).with_size(art_cache.font_size_pt - 1)
+                        _append(_make_paragraph_xml(val, meta_cache, italic=True))
 
                     elif field_name == "link":
                         if val and val != "N/A":
@@ -299,7 +307,10 @@ def build_document(template_info: TemplateInfo, article_blocks: list[dict]) -> t
                             # Create a real clickable hyperlink
                             _append(_make_hyperlink_xml(doc, val, link_text, link_cache))
 
-                    elif field_name == "summary":
+                    elif field_name in ["summary", "summary_of_article"]:
+                        _append(_make_paragraph_xml(val, art_cache))
+
+                    else:
                         _append(_make_paragraph_xml(val, art_cache))
 
                 # Separator after each article

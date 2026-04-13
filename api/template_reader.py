@@ -74,26 +74,29 @@ def _is_section_heading(text: str) -> bool:
     t = text.strip().lower()
     return any(kw in t for kw in SECTION_KEYWORDS)
 
-def _detect_field(text: str) -> Optional[str]:
+def _detect_field(text: str) -> str:
     """
     Detect which article field a template line represents.
-    Rules:
-      - Contains '|' -> publisher_author
-      - Contains 'http' or 'url' keywords -> link
-      - Contains 'date' or 'published' -> date_time
-      - Contains 'summary' or > 8 words -> summary
-      - else -> title
+    Includes canonical mapping and fallbacks to the exact text.
     """
     t = text.strip().lower()
     if "|" in t:
         return "publisher_author"
+    
+    if any(k in t for k in ["publisher/agency", "publisher", "agency", "publication", "source", "media"]):
+        return "publisher_name"
+    if any(k in t for k in ["author", "journalist", "reporter", "byline", "writer"]):
+        return "author_or_journalist"
     if re.search(r"https?://", t, re.I) or any(k in t for k in ["resolved url", "url", "link"]):
         return "link"
     if any(k in t for k in ["date", "time", "published"]):
         return "date_time"
-    if any(k in t for k in ["summary", "description", "abstract"]) or len(t.split()) > 8:
-        return "summary"
-    return "title"
+    if any(k in t for k in ["summary", "description", "abstract", "content"]) or len(t.split()) > 8:
+        return "summary_of_article"
+    if any(k in t for k in ["title", "headline", "subject"]):
+        return "title"
+    
+    return text.strip()
 
 def read_template(file_object) -> tuple[TemplateInfo, str]:
     try:
@@ -126,11 +129,13 @@ def read_template(file_object) -> tuple[TemplateInfo, str]:
         # Pattern detection (Everywhere)
         f_type = _detect_field(text)
         
-        # If it's a specific field (not just a generic title) or we are already past header
-        # Update: We now treat "title" keyword as specific too!
-        is_specific = f_type in ["publisher_author", "link", "summary", "date_time"] or "title" in text.lower()
+        # Determine if it's a matched canonical field
+        is_canonical = f_type in [
+            "publisher_author", "link", "summary_of_article", "date_time", 
+            "publisher_name", "author_or_journalist", "title"
+        ]
         
-        if f_type and (not in_header or is_specific):
+        if f_type and (not in_header or is_canonical):
             if f_type not in captured_fields:
                 captured_fields.append(f_type)
                 if not info.article_style.font_name:
@@ -138,7 +143,7 @@ def read_template(file_object) -> tuple[TemplateInfo, str]:
             
             # If we found an article field in the header area, 
             # use it for the layout but don't treat it as a static global title
-            if in_header and is_specific:
+            if in_header and is_canonical:
                 continue
 
         if in_header:
