@@ -47,7 +47,7 @@ async def preview_endpoint(dataset: UploadFile = File(...)):
     """Extract first few rows of the dataset for UI preview."""
     try:
         content = await dataset.read()
-        data, msg = data_loader.load_dataset(io.BytesIO(content))
+        data, msg = data_loader.load_dataset(io.BytesIO(content), dataset.filename)
         if not data:
             return JSONResponse(content={"error": msg}, status_code=400)
         
@@ -69,7 +69,7 @@ async def generate_report(
     try:
         # 1. Load Dataset
         ds_content = await dataset.read()
-        data, ds_msg = data_loader.load_dataset(io.BytesIO(ds_content))
+        data, ds_msg = data_loader.load_dataset(io.BytesIO(ds_content), dataset.filename)
         
         if not data:
             return JSONResponse(status_code=400, content={"detail": ds_msg})

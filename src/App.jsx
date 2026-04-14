@@ -26,7 +26,9 @@ import {
   ArrowRight,
   Maximize2,
   X,
-  Table as TableIcon
+  Table as TableIcon,
+  Edit2,
+  Save
 } from 'lucide-react';
 import './App.css';
 
@@ -41,6 +43,8 @@ const FIELD_POOL = [
 const App = () => {
   const [dataset, setDataset] = useState(null);
   const [dataPreview, setDataPreview] = useState(null);
+  const [editingRow, setEditingRow] = useState(null);
+  const [editFormData, setEditFormData] = useState({});
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [fields, setFields] = useState([...FIELD_POOL]);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -50,6 +54,7 @@ const App = () => {
   const [downloadUrl, setDownloadUrl] = useState(null);
   const [error, setError] = useState(null);
   const [status, setStatus] = useState([]);
+  const [excludedRows, setExcludedRows] = useState([]);
 
   const datasetRef = useRef(null);
 
@@ -66,7 +71,11 @@ const App = () => {
       const res = await fetch('/api/preview', { method: 'POST', body: formData });
       const json = await res.json();
       if (res.ok) {
-        setDataPreview(json);
+        setDataPreview({
+          ...json,
+          preview: json.preview.map((row, index) => ({ ...row, __originalIndex: index }))
+        });
+        setExcludedRows([]);
       } else {
         setError(json.error || "Failed to parse dataset.");
       }
@@ -111,6 +120,36 @@ const App = () => {
     setShowAddMenu(false);
   };
 
+  const toggleRow = (index) => {
+    setExcludedRows(prev => prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index]);
+  };
+  
+  const toggleAllRows = () => {
+    if (excludedRows.length > 0) {
+      setExcludedRows([]); // Select all (clear exclusions)
+    } else {
+      setExcludedRows(dataPreview.preview.map((_, i) => i)); // Deselect all (exclude all)
+    }
+  };
+
+  const startEdit = (index, rowData) => {
+    setEditingRow(index);
+    setEditFormData({ ...rowData });
+  };
+
+  const saveEdit = (index) => {
+    setDataPreview(prev => {
+      const newPreview = [...prev.preview];
+      newPreview[index] = { ...newPreview[index], ...editFormData };
+      return { ...prev, preview: newPreview };
+    });
+    setEditingRow(null);
+  };
+
+  const handleEditChange = (key, value) => {
+    setEditFormData(prev => ({ ...prev, [key]: value }));
+  };
+
   const unusedFields = FIELD_POOL.filter(p => !fields.find(f => f.id === p.id));
 
   const handleGenerate = async () => {
@@ -122,8 +161,42 @@ const App = () => {
     setStatus([{ id: 1, msg: 'Calibrating AI synthesis...', active: true }]);
 
     try {
+      if (!dataPreview || !dataPreview.preview) throw new Error("Preview data not ready.");
+
+      // Ensure any active edits are applied immediately for generation
+      let finalPreview = dataPreview.preview;
+      if (editingRow !== null) {
+        finalPreview = [...dataPreview.preview];
+        finalPreview[editingRow] = { ...finalPreview[editingRow], ...editFormData };
+        // We also want to save it to state so the UI reflects it
+        setDataPreview(prev => ({ ...prev, preview: finalPreview }));
+        setEditingRow(null);
+      }
+
+      // Front-end Filtering: Only build a dataset out of the rows the user kept.
+      const dataToKeep = finalPreview.filter((_, i) => !excludedRows.includes(i));
+      
+      if (dataToKeep.length === 0) {
+        throw new Error("Cannot generate a report with 0 articles.");
+      }
+
+      const headers = Object.keys(dataToKeep[0]).filter(k => k !== '__originalIndex');
+      
+      const csvContent = [
+        headers.map(h => `"${String(h).replace(/"/g, '""')}"`).join(','),
+        ...dataToKeep.map(row => 
+          headers.map(h => {
+             const strVal = String(row[h] !== null && row[h] !== undefined ? row[h] : "");
+             return `"${strVal.replace(/"/g, '""')}"`;
+          }).join(',')
+        )
+      ].join('\n');
+      
+      // We pass the filtered subset as a fresh CSV file!
+      const newDataset = new File([csvContent], "filtered_dataset.csv", { type: "text/csv" });
+
       const formData = new FormData();
-      formData.append('dataset', dataset);
+      formData.append('dataset', newDataset);
       formData.append('field_order', fields.map(f => f.id).join(','));
       
       const response = await fetch('/api/generate', {
@@ -284,7 +357,7 @@ const App = () => {
                   {fields.map(f => (
                     <div key={f.id} className={`mock-f field-${f.id}`}>
                       {f.id === 'title' && "Intelligence Synthesis: Q2 Market Shift"}
-                      {f.id === 'link' && "https://platform.intel/report-q2"}
+                      {f.id === 'link' && <a href="https://platform.intel/report-q2" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>https://platform.intel/report-q2</a>}
                       {f.id === 'publisher_author' && "Strategic Lab & Partners"}
                       {f.id === 'summary_of_article' && "Automated analysis reveals critical deviations in forecast patterns. Mitigation strategies recommended for immediate deployment."}
                       {f.id === 'date_time' && "Monday, April 13, 2026"}
@@ -352,7 +425,7 @@ const App = () => {
               <div className="modal-header">
                  <div className="modal-title">
                     <TableIcon size={20} /> FULL DATASET TRACE
-                    {dataPreview && <span>{dataPreview.total_rows} Entries Mapped</span>}
+                    {dataPreview && <span>{dataPreview.total_rows - excludedRows.length} Entries Selected</span>}
                  </div>
                  <button className="close-btn" onClick={() => setShowPreviewModal(false)}><X size={20} /></button>
               </div>
@@ -368,17 +441,85 @@ const App = () => {
                     <table className="beast-table">
                       <thead>
                         <tr>
-                          {Object.keys(dataPreview.preview[0]).map(h => (
+                          <th style={{ width: '40px', textAlign: 'center' }}>
+                            <input 
+                              type="checkbox" 
+                              checked={dataPreview.preview.length > 0 && excludedRows.length === 0} 
+                              onChange={toggleAllRows} 
+                              style={{ cursor: 'pointer' }}
+                            />
+                          </th>
+                          {Object.keys(dataPreview.preview[0]).filter(k => k !== '__originalIndex').map(h => (
                             <th key={h}>{h.replace(/_/g, ' ').toUpperCase()}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
                         {dataPreview.preview.map((row, i) => (
-                          <tr key={i}>
-                            {Object.values(row).map((v, j) => (
-                              <td key={j}>{String(v)}</td>
-                            ))}
+                          <tr key={i} style={{ opacity: excludedRows.includes(i) ? 0.4 : 1, transition: 'opacity 0.2s' }}>
+                            <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                              <input 
+                                type="checkbox" 
+                                checked={!excludedRows.includes(i)} 
+                                onChange={() => toggleRow(i)} 
+                                style={{ cursor: 'pointer', verticalAlign: 'middle', marginRight: '8px' }}
+                              />
+                              {editingRow === i ? (
+                                <button 
+                                  onClick={() => saveEdit(i)} 
+                                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', verticalAlign: 'middle', padding: '2px' }}
+                                  title="Save Changes"
+                                >
+                                  <Save size={16} color="#10b981" />
+                                </button>
+                              ) : (
+                                <button 
+                                  onClick={() => startEdit(i, row)} 
+                                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', verticalAlign: 'middle', padding: '2px' }}
+                                  title="Edit Row"
+                                >
+                                  <Edit2 size={16} color="#64748b" />
+                                </button>
+                              )}
+                            </td>
+                            {Object.entries(row).filter(([k]) => k !== '__originalIndex').map(([k, v], j) => {
+                              const strVal = String(v !== null && v !== undefined ? v : '');
+                              const isLink = strVal.startsWith('http://') || strVal.startsWith('https://');
+                              
+                              if (editingRow === i) {
+                                return (
+                                  <td key={j} style={{ padding: '4px' }}>
+                                    <textarea 
+                                      value={editFormData[k] !== undefined ? editFormData[k] : strVal}
+                                      onChange={(e) => handleEditChange(k, e.target.value)}
+                                      style={{ 
+                                        width: '100%', 
+                                        minWidth: '150px',
+                                        minHeight: '60px', 
+                                        padding: '6px', 
+                                        border: '1px solid #cbd5e1', 
+                                        borderRadius: '4px', 
+                                        fontSize: '13px', 
+                                        fontFamily: 'inherit',
+                                        resize: 'vertical'
+                                      }}
+                                    />
+                                  </td>
+                                );
+                              }
+                              
+                              return (
+                                <td key={j}>
+                                  {isLink ? (
+                                    <a href={strVal} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>
+                                      {strVal}
+                                    </a>
+                                  ) : (
+                                    strVal
+                                  )}
+                                </td>
+                              );
+                            })}
                           </tr>
                         ))}
                       </tbody>
@@ -400,7 +541,17 @@ const App = () => {
               
               <div className="modal-footer">
                  <div className="status-pill">{dataPreview?.message || (error ? "Mapping Failed" : "Awaiting Byte-stream...")}</div>
-                 <button className="modal-btn-primary" onClick={() => setShowPreviewModal(false)}>Close Preview</button>
+                 <div style={{ display: 'flex', gap: '12px' }}>
+                   <button className="modal-btn-primary" onClick={() => setShowPreviewModal(false)} style={{ background: '#f1f5f9', color: '#64748b' }}>Close</button>
+                   <button 
+                     className="modal-btn-primary" 
+                     onClick={() => { setShowPreviewModal(false); handleGenerate(); }}
+                     disabled={isGenerating || fields.length === 0}
+                     style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                   >
+                     <CheckCircle size={16} /> Done & Generate
+                   </button>
+                 </div>
               </div>
             </motion.div>
           </motion.div>

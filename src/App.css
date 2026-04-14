@@ -143,9 +143,9 @@ body {
 
 .modal-card-beast {
   background: #fff;
-  width: 100%;
-  max-width: 1000px;
-  max-height: 80vh;
+  width: 95%;
+  max-width: 1400px;
+  max-height: 90vh;
   border-radius: 32px;
   box-shadow: 0 40px 100px -20px rgba(0,0,0,0.3);
   display: flex;
@@ -218,10 +218,8 @@ body {
   font-size: 0.85rem;
   color: #334155;
   border-bottom: 1px solid #f8fafc;
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  max-width: 400px;
+  word-wrap: break-word;
 }
 
 .beast-table tr:hover td {

@@ -43,7 +43,7 @@ def _match_column(header_name: str) -> str:
                 return canonical
     return header_name  # Keep as-is if no match
 
-def load_dataset(file_object) -> tuple[list, str]:
+def load_dataset(file_object, source_filename: str = "") -> tuple[list, str]:
     """
     Load data as a list of dictionaries (Mocking a DataFrame-like list).
     Supports .xlsx, .xls (partially), and .csv.
@@ -51,10 +51,13 @@ def load_dataset(file_object) -> tuple[list, str]:
     data = []
     try:
         raw = file_object.read()
-        filename = getattr(file_object, "name", "upload").lower()
+        
+        filename = source_filename.lower() if source_filename else getattr(file_object, "name", "upload").lower()
+        
+        logger.info(f"DATA LOADER: Parsing file: source_filename='{source_filename}', evaluated filename='{filename}'")
 
         # ─── CASE: CSV ────────────────────────────────────────────────────────
-        if filename.endswith(".csv"):
+        if filename.endswith(".csv") or filename == "upload":
             stream = io.StringIO(raw.decode('utf-8', errors='ignore'))
             reader = csv.DictReader(stream)
             headers = {h: _match_column(h) for h in (reader.fieldnames or [])}
