@@ -440,7 +440,22 @@ const App = () => {
                   </div>
                 ) : <p>No data.</p>}
               </div>
-              <div className="modal-footer"><button className="modal-btn-primary" onClick={() => setShowPreviewModal(false)}>Close</button></div>
+              <div className="modal-footer">
+                <button className="modal-btn-secondary" onClick={() => setShowPreviewModal(false)}>Done</button>
+                <div className="modal-actions-right">
+                  <button 
+                    className="modal-btn-primary" 
+                    onClick={() => {
+                      setShowPreviewModal(false);
+                      handleGenerate();
+                    }}
+                    disabled={!dataset || isGenerating || fields.length === 0}
+                  >
+                    {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <Zap size={18} />}
+                    {isGenerating ? "Generating..." : "Generate Report"}
+                  </button>
+                </div>
+              </div>
             </motion.div>
           </motion.div>
         )}
